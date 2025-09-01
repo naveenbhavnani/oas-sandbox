@@ -1,0 +1,335 @@
+# Petstore API Scenarios
+# This file demonstrates various scenario patterns for the Pet Store API
+
+scenarios:
+  # Pet Management Scenarios
+  - when:
+      operationId: createPet
+    do:
+      - state.increment:
+          key: "pet:nextId"
+          by: 1
+          as: "newPetId"
+      - state.set:
+          key: "pet:{{ctx.vars.newPetId}}"
+          value:
+            $template: true
+            id: "{{ctx.vars.newPetId}}"
+            name: "{{req.body.name}}"
+            tag: "{{req.body.tag}}"
+            status: "{{req.body.status || 'available'}}"
+            createdAt: "{{now.toISOString()}}"
+            updatedAt: "{{now.toISOString()}}"
+      - respond:
+          status: 201
+          headers:
+            Location: "/pets/{{ctx.vars.newPetId}}"
+          body:
+            $template: true
+            $schema: "#/components/schemas/Pet"
+            id: "{{ctx.vars.newPetId}}"
+            name: "{{req.body.name}}"
+            tag: "{{req.body.tag}}"
+            status: "{{req.body.status || 'available'}}"
+            photoUrls: []
+
+  - when:
+      operationId: showPetById
+    do:
+      - if:
+          when: "{{state['pet:' + req.path.params.petId]}}"
+          then:
+            - delay: "10±5ms"
+            - respond:
+                status: 200
+                body: "{{state['pet:' + req.path.params.petId]}}"
+          else:
+            - respond:
+                status: 404
+                body:
+                  $template: true
+                  code: 404
+                  message: "Pet not found"
+                  details: "No pet found with ID {{req.path.params.petId}}"
+
+  - when:
+      operationId: updatePet
+    do:
+      - if:
+          when: "{{state['pet:' + req.path.params.petId]}}"
+          then:
+            - state.patch:
+                key: "pet:{{req.path.params.petId}}"
+                value:
+                  $template: true
+                  name: "{{req.body.name || state['pet:' + req.path.params.petId].name}}"
+                  tag: "{{req.body.tag || state['pet:' + req.path.params.petId].tag}}"
+                  status: "{{req.body.status || state['pet:' + req.path.params.petId].status}}"
+                  updatedAt: "{{now.toISOString()}}"
+            - respond:
+                status: 200
+                body: "{{state['pet:' + req.path.params.petId]}}"
+          else:
+            - respond:
+                status: 404
+                body:
+                  code: 404
+                  message: "Pet not found"
+
+  - when:
+      operationId: deletePet
+    do:
+      - if:
+          when: "{{state['pet:' + req.path.params.petId]}}"
+          then:
+            - state.del:
+                key: "pet:{{req.path.params.petId}}"
+            - respond:
+                status: 204
+          else:
+            - respond:
+                status: 404
+                body:
+                  code: 404
+                  message: "Pet not found"
+
+  - when:
+      operationId: listPets
+    do:
+      - delay: "20±10ms"
+      - respond:
+          status: 200
+          headers:
+            X-Total-Count: "{{Object.keys(state).filter(key => key.startsWith('pet:')).length}}"
+          body:
+            $template: true
+            # Filter pets by tag if provided
+            $ref: "#/components/schemas/Pet"
+            # Return all pets or filtered by tag/limit
+            data: >
+              {{
+                Object.values(state)
+                  .filter(v => v.id && (!req.query.tag || v.tag === req.query.tag))
+                  .slice(0, req.query.limit || 20)
+              }}
+
+  # Owner Management Scenarios  
+  - when:
+      operationId: createOwner
+    do:
+      - state.increment:
+          key: "owner:nextId"
+          by: 1
+          as: "newOwnerId"
+      - state.set:
+          key: "owner:{{ctx.vars.newOwnerId}}"
+          value:
+            $template: true
+            id: "{{ctx.vars.newOwnerId}}"
+            name: "{{req.body.name}}"
+            email: "{{req.body.email}}"
+            phone: "{{req.body.phone || faker.phone.number()}}"
+            address: "{{req.body.address || {
+              street: faker.location.streetAddress(),
+              city: faker.location.city(),
+              state: faker.location.state(),
+              zipCode: faker.location.zipCode(),
+              country: 'US'
+            }}}"
+            createdAt: "{{now.toISOString()}}"
+      - respond:
+          status: 201
+          headers:
+            Location: "/owners/{{ctx.vars.newOwnerId}}"
+          body: "{{state['owner:' + ctx.vars.newOwnerId]}}"
+
+  - when:
+      operationId: getOwnerById
+    do:
+      - if:
+          when: "{{state['owner:' + req.path.params.ownerId]}}"
+          then:
+            - respond:
+                status: 200
+                body: "{{state['owner:' + req.path.params.ownerId]}}"
+          else:
+            - respond:
+                status: 404
+                body:
+                  code: 404
+                  message: "Owner not found"
+
+  - when:
+      operationId: listOwners
+    do:
+      - respond:
+          status: 200
+          body:
+            $template: true
+            data: >
+              {{Object.values(state).filter(v => v.email)}}
+
+  # Photo Upload Scenario
+  - when:
+      operationId: uploadPetPhoto
+    do:
+      - if:
+          when: "{{state['pet:' + req.path.params.petId]}}"
+          then:
+            - state.patch:
+                key: "pet:{{req.path.params.petId}}"
+                value:
+                  $template: true
+                  photoUrls: >
+                    {{
+                      (state['pet:' + req.path.params.petId].photoUrls || [])
+                        .concat(['https://cdn.example.com/pets/' + req.path.params.petId + '/photo-' + uuid() + '.jpg'])
+                    }}
+                  updatedAt: "{{now.toISOString()}}"
+            - delay: "200±100ms"  # Simulate file processing
+            - respond:
+                status: 200
+                body:
+                  $template: true
+                  url: "https://cdn.example.com/pets/{{req.path.params.petId}}/photo-{{uuid()}}.jpg"
+                  filename: "pet-{{req.path.params.petId}}-photo.jpg"
+                  size: "{{rand(100000, 5000000)}}"
+          else:
+            - respond:
+                status: 404
+                body:
+                  code: 404
+                  message: "Pet not found"
+
+  # Advanced Scenarios with Conditions
+
+  # Premium user scenario (based on API key)
+  - when:
+      operationId: listPets
+      match:
+        headers:
+          X-API-Key: "premium-key-123"
+    priority: 10  # Higher priority than basic listPets
+    do:
+      - respond:
+          status: 200
+          headers:
+            X-Premium-User: "true"
+            X-Rate-Limit: "1000"
+          body:
+            $template: true
+            data: >
+              {{Object.values(state).filter(v => v.id).map(pet => ({
+                ...pet,
+                premium: true,
+                detailedInfo: {
+                  lastUpdated: pet.updatedAt,
+                  views: rand(1, 1000),
+                  popularity: rand(1, 100)
+                }
+              }))}}
+
+  # Error simulation scenario
+  - when:
+      operationId: createPet
+      match:
+        headers:
+          X-Simulate-Error: "true"
+    priority: 20
+    do:
+      - delay: "1000±500ms"
+      - respond:
+          status: 500
+          body:
+            code: 500
+            message: "Internal server error"
+            details: "Simulated error for testing"
+
+  # Rate limiting scenario
+  - when:
+      operationId: listPets
+      match:
+        headers:
+          X-Rate-Limit-Test: "true"
+    priority: 15
+    do:
+      - state.increment:
+          key: "rateLimit:{{session.id}}:{{Math.floor(now.getTime() / 60000)}}"
+          as: "requestCount"
+      - if:
+          when: "{{ctx.vars.requestCount > 100}}"
+          then:
+            - respond:
+                status: 429
+                headers:
+                  Retry-After: "60"
+                  X-RateLimit-Remaining: "0"
+                body:
+                  code: 429
+                  message: "Rate limit exceeded"
+                  details: "Maximum 100 requests per minute allowed"
+          else:
+            - respond:
+                status: 200
+                headers:
+                  X-RateLimit-Remaining: "{{100 - ctx.vars.requestCount}}"
+                body:
+                  $template: true
+                  data: "{{Object.values(state).filter(v => v.id)}}"
+
+  # Chaos engineering - random failures
+  - when:
+      method: "POST"
+      match:
+        headers:
+          X-Chaos-Level: "high"
+    priority: 100
+    do:
+      - if:
+          when: "{{rand(1, 100) <= 20}}"  # 20% failure rate
+          then:
+            - delay: "5000±2000ms"
+            - respond:
+                status: "{{[500, 502, 503, 504][rand(0, 3)]|0}}"
+                body:
+                  $template: true
+                  code: 503
+                  message: "Service temporarily unavailable"
+                  details: "Chaos engineering failure simulation"
+
+  # A/B testing scenario
+  - when:
+      operationId: showPetById
+      match:
+        headers:
+          X-AB-Test-Group: "experimental"
+    priority: 5
+    do:
+      - if:
+          when: "{{state['pet:' + req.path.params.petId]}}"
+          then:
+            - respond:
+                status: 200
+                headers:
+                  X-AB-Test-Version: "experimental-v1"
+                body:
+                  $template: true
+                  # Enhanced response with additional fields
+                  id: "{{state['pet:' + req.path.params.petId].id}}"
+                  name: "{{state['pet:' + req.path.params.petId].name}}"
+                  tag: "{{state['pet:' + req.path.params.petId].tag}}"
+                  status: "{{state['pet:' + req.path.params.petId].status}}"
+                  # Experimental fields
+                  experimental:
+                    mood: "{{['happy', 'playful', 'sleepy', 'excited'][rand(0, 3)]|0}}"
+                    lastActivity: "{{faker.date.recent().toISOString()}}"
+                    healthScore: "{{rand(70, 100)}}"
+                  analytics:
+                    views: "{{rand(1, 1000)}}"
+                    likes: "{{rand(0, 100)}}"
+          else:
+            - respond:
+                status: 404
+                body:
+                  code: 404
+                  message: "Pet not found"

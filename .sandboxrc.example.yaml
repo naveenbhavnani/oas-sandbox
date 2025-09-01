@@ -1,0 +1,18 @@
+# OAS Sandbox Configuration Example
+openapi: "./examples/petstore.yaml"
+port: 3000
+host: "0.0.0.0"
+scenarios: "./scenarios"
+state: "memory"  # or "file://./data/state.json" or "redis://localhost:6379"
+seed: "my-seed-123"
+latency: "100±25ms"  # Add simulated latency
+errorRate: 0.05  # 5% error rate
+proxy: "https://petstore.swagger.io"
+record: "unmatched"  # Record unmatched requests when proxying
+redact: 
+  - "authorization"
+  - "x-api-key"
+admin: true  # Enable admin endpoints at /_sandbox/*
+validateRequests: true
+strictResponses: false
+logLevel: "info"

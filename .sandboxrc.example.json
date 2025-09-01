@@ -1,0 +1,12 @@
+{
+  "openapi": "./examples/petstore.yaml",
+  "port": 3000,
+  "host": "0.0.0.0",
+  "scenarios": "./scenarios",
+  "state": "memory",
+  "validateRequests": true,
+  "strictResponses": false,
+  "logLevel": "info",
+  "admin": false,
+  "record": "unmatched"
+}
