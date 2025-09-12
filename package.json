@@ -1,6 +1,6 @@
 {
   "name": "oas-sandbox",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A stateful, spec-first OpenAPI mock server with scenarios and state management. Recording/replay features coming in v1.1.0.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
