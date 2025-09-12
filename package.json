@@ -34,12 +34,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/your-org/oas-sandbox.git"
+    "url": "git+https://github.com/naveenbhavnani/oas-sandbox.git"
   },
   "bugs": {
-    "url": "https://github.com/your-org/oas-sandbox/issues"
+    "url": "https://github.com/naveenbhavnani/oas-sandbox/issues"
   },
-  "homepage": "https://github.com/your-org/oas-sandbox#readme",
+  "homepage": "https://github.com/naveenbhavnani/oas-sandbox#readme",
   "files": [
     "dist",
     "README.md",
